@@ -4975,6 +4975,9 @@ export class DeckGLMap {
       const icao24 = (data as { icao24?: string }).icao24;
       if (icao24) this.popup.loadWingbitsLiveFlight(icao24);
     }
+    if (popupType === 'conflict') {
+      this.popup.loadConflictHistory(data as import('@/types').ConflictZone);
+    }
   }
 
   private async showWebcamClickPopup(webcam: WebcamEntry, x: number, y: number): Promise<void> {
@@ -6914,6 +6917,7 @@ export class DeckGLMap {
       const screenPos = this.projectToScreen(conflict.center[1], conflict.center[0]);
       const { x, y } = screenPos || this.getContainerCenter();
       this.popup.show({ type: 'conflict', data: conflict, x, y });
+      this.popup.loadConflictHistory(conflict);
     }
   }
 
