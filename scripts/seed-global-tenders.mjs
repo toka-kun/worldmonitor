@@ -212,6 +212,17 @@ export async function fetchWorldBank({ now = Date.now(), fetchJsonFn = fetchJson
   return { records, status: sourceStatus('world-bank', 'ok', records, '', now) };
 }
 
+// An Australian `austender` adapter is BLOCKED on the provider (#5286): no
+// permitted machine-readable AusTender interface publishes the closing date
+// that isOpenOpportunity requires. As of 2026-07-13 (checked against a
+// same-day capture of the feed, corroborated by its independent consumers):
+// the official current-ATM RSS (https://www.tenders.gov.au/public_data/rss/rss.xml,
+// registered on data.gov.au) carries only title/link/description/pubDate —
+// no close date, buyer, or category; the official OCDS API
+// (api.tenders.gov.au/ocds/*) exposes awarded contract notices, not open
+// ATMs; data.gov.au's machine-readable open-ATM exports ended June 2014.
+// Closing dates exist only on per-notice HTML pages, and scraping them is an
+// explicit non-goal. Do not substitute GETS (NZ) for Australian coverage.
 const SOURCE_ADAPTERS = [
   ['sam', fetchSam],
   ['ted', fetchTed],

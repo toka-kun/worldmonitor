@@ -46,9 +46,20 @@ The official setup and request-limit details are in the [GSA Get Opportunities P
 
 Leaving SAM unconfigured is a supported state, not a degradation: `/api/health` reports that source as [`NOT_CONFIGURED`](/docs/health-endpoints) (green, excluded from `problems`) rather than as an error, so a deployment that never obtains a GSA key still reports a clean health endpoint. Adding the key flips it to `OK` on the next seed run with no health-config change.
 
+### Australia: AusTender adapter is blocked
+
+An official Australian `austender` adapter cannot ship safely today, because no permitted machine-readable AusTender interface publishes the closing date that an open-opportunity record requires. Evidence, current as of 2026-07-13:
+
+- The official AusTender current-ATM RSS feed (`https://www.tenders.gov.au/public_data/rss/rss.xml`, registered on [data.gov.au](https://data.gov.au/data/dataset/latest-approaches-to-markets-listed-on-austender) by the Department of Finance) publishes only a notice title, official link, free-text description, and publish date. It carries no closing date, buyer, or category fields.
+- The official [AusTender OCDS API](https://github.com/austender/austender-ocds-api) exposes awarded contract notices from 2013 onward, not open Approaches to Market.
+- data.gov.au's machine-readable open-ATM exports ended in June 2014.
+- Closing dates are published only on per-notice HTML pages; harvesting them would mean scraping the AusTender website, which is not a documented machine-readable reuse interface and is excluded by this feed's non-goals.
+
+This feed never represents a record without a verifiable future closing date, so Australian coverage remains absent rather than inferred, and New Zealand GETS coverage is not substituted for it. Filtering on `country=AU` keeps the standard `countryCoverage: "unknown"` semantics for unobserved countries. If AusTender begins publishing closing dates through a machine-readable channel, the adapter can ship without pipeline changes.
+
 ## API
 
-`GET /api/economic/v1/list-global-tenders` is Pro-gated, deliberately paginated, and is **not** part of the bootstrap payload. It supports `country`, repeated `countries`, `region`, `source`, `status`, `buyer`, `published_from`, `published_to`, `deadline_from`, `deadline_to`, `min_value`, `max_value`, `currency`, `category`, `query`, `page_size`, `cursor`, and `sort`.
+`GET /api/economic/v1/list-global-tenders` is Pro-gated, deliberately paginated, and is **not** part of the bootstrap payload. It supports `country`, repeated `countries`, `region`, `source`, `status`, `buyer`, `published_from`, `published_to`, `deadline_from`, `deadline_to`, `min_value`, `max_value`, `currency`, `category`, `query`, `min_automation_score`, `page_size`, `cursor`, and `sort`.
 
 Supported sorts are `newest`, `closing_soon`, `estimated_value`, and `relevance`. `page_size` is bounded to 100. The response includes applied filters, a cursor, snapshot time, availability, and source-health summaries.
 
@@ -57,5 +68,7 @@ Every record contains a stable WorldMonitor ID (`source:sourceNoticeId`), its of
 ## Technology relevance
 
 `automationFit` is a transparent keyword-based relevance signal for software, AI, data, cybersecurity, automation, cloud, and related terms. It contains a score, classification version, match reasons, and text evidence. It is **not** a legal or procurement-eligibility determination: `participationMode` remains `unknown` unless an upstream source explicitly supports it.
+
+The optional `min_automation_score` query parameter (an integer from 1–100; larger values are clamped and non-integer values are ignored) returns only opportunities whose `automationFit.score` meets the threshold. It is disabled by default, so existing callers keep receiving every matching open opportunity, and when active it appears in the response's `appliedFilters`. The dedicated panel exposes it as a **Technology relevant only** checkbox. Both the filter and the per-record match reasons express keyword relevance evidence only — they never assert that an AI system, agent, or vendor is eligible to bid.
 
 The dashboard renders official notice links only after URL sanitization and exposes the relevance reason alongside the source-provided opportunity details.

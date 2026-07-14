@@ -90,6 +90,13 @@ message ListGlobalTendersRequest {
   string published_from = 17 [(sebuf.http.query) = {name: "published_from"}];
   // Include opportunities published on or before this ISO-8601 timestamp.
   string published_to = 18 [(sebuf.http.query) = {name: "published_to"}];
+  // Include only opportunities whose keyword-based automation_fit score is at
+  // or above this integer value (1-100; values above 100 are clamped, and
+  // non-integer or non-positive values disable the filter). Disabled when 0
+  // or unset, which preserves the default all-open-opportunities behavior.
+  // This is an evidence-backed text-relevance threshold only; it does not
+  // assert that any party is eligible to bid.
+  int32 min_automation_score = 19 [(sebuf.http.query) = {name: "min_automation_score"}];
 }
 
 message ListGlobalTendersResponse {

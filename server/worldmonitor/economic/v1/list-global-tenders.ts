@@ -104,6 +104,14 @@ export function filterAndPaginateTenders(tenders: GlobalTender[], req: ListGloba
   const hasPublishedTo = Boolean(req.publishedTo);
   const minValue = req.minValue > 0 ? req.minValue : null;
   const maxValue = req.maxValue > 0 ? req.maxValue : null;
+  // Evidence-backed relevance threshold; disabled unless a positive bounded
+  // value is supplied so unfiltered callers keep the complete open feed.
+  // The field is int32 in the contract, so non-integer input is malformed and
+  // disables the filter (mirroring page_size), keeping runtime behavior
+  // aligned with the integer type the OpenAPI schema advertises.
+  const minAutomationScore = Number.isInteger(req.minAutomationScore) && req.minAutomationScore > 0
+    ? Math.min(100, req.minAutomationScore)
+    : null;
   const sort = ['newest', 'closing_soon', 'estimated_value', 'relevance'].includes(req.sort) ? req.sort : 'newest';
 
   const appliedFilters = [
@@ -111,6 +119,7 @@ export function filterAndPaginateTenders(tenders: GlobalTender[], req: ListGloba
     hasDeadlineFrom && 'deadline_from', hasDeadlineTo && 'deadline_to', minValue !== null && 'min_value', maxValue !== null && 'max_value',
     currency && 'currency', category && 'category', query && 'query', buyer && 'buyer',
     hasPublishedFrom && 'published_from', hasPublishedTo && 'published_to',
+    minAutomationScore !== null && 'min_automation_score',
   ].filter((value): value is string => Boolean(value));
 
   const filtered = tenders.filter((tender) => {
@@ -130,6 +139,7 @@ export function filterAndPaginateTenders(tenders: GlobalTender[], req: ListGloba
       && (maxValue === null || (typeof amount === 'number' && amount <= maxValue))
       && (!currency || normalized(tender.money?.currency) === currency)
       && (!category || [...tender.categoryCodes, ...tender.sectors].some((value) => normalized(value).includes(category)))
+      && (minAutomationScore === null || (tender.automationFit?.score || 0) >= minAutomationScore)
       && matchesText(tender, query);
   }).sort((left, right) => compareTenders(sort, left, right));
 

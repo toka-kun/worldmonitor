@@ -27,7 +27,7 @@ test('dedicated procurement panel supports discovery controls, pagination, and s
   assert.match(panel, /nextCursor/);
   assert.match(panel, /const safeUrl = sanitizeUrl\(tender\.officialUrl\)/);
   assert.match(panel, /href="\$\{safeUrl\}" target="_blank" rel="noopener noreferrer nofollow"/);
-  assert.match(panel, /Technology relevance:/);
+  assert.match(panel, /Technology relevance \(keyword evidence, not bidding eligibility\):/);
   assert.match(panel, /CLOSING SOON/);
   assert.doesNotMatch(economicPanel, /procurement|GlobalTender|tenderData|updateTenders|clearTenders/i);
 });
@@ -71,4 +71,48 @@ test('procurement deployment documentation identifies the sole optional source c
   assert.match(envExample, /SAM_GOV_API_KEY=/);
   assert.match(docs, /SAM_GOV_API_KEY/);
   assert.match(docs, /TED, Contracts Finder, CanadaBuys, GETS, and World Bank do not require API keys/);
+});
+
+test('the documented AusTender blocker stays documented and no scraper ships in its place', () => {
+  const seeder = readFileSync(resolve(import.meta.dirname, '../scripts/seed-global-tenders.mjs'), 'utf8');
+  const normalizer = readFileSync(resolve(import.meta.dirname, '../scripts/_global-tenders.mjs'), 'utf8');
+  assert.match(docs, /### Australia: AusTender adapter is blocked/);
+  assert.match(docs, /no close|closing date/i);
+  assert.match(seeder, /austender.*BLOCKED on the provider/s);
+
+  // Any AusTender identifier, host, or notice-path reference in CODE (the
+  // blocker comment legitimately cites the feed URLs, so comments are
+  // stripped first) means a scraper or adapter is being reintroduced without
+  // going through the documented unblock path.
+  const scraperPattern = /austender|tenders\.gov\.au|atm\/(show|searchdescription|docshow)/i;
+  const stripComments = (source: string) => source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(stripComments(seeder), scraperPattern);
+  assert.doesNotMatch(stripComments(normalizer), scraperPattern);
+  assert.doesNotMatch(panel, /austender|tenders\.gov\.au/i);
+
+  // Self-test: the pattern must catch casing and naming evasions, so a green
+  // guard cannot coexist with a renamed or relocated scraper.
+  for (const evasion of [
+    'function scrapeAusTender() {}',
+    "fetch('https://www.TENDERS.gov.au/Atm/Show/abc')",
+    'const url = `${base}/ATM/SHOW/${id}`',
+    'AUSTENDER_FEED_URL',
+  ]) {
+    assert.match(evasion, scraperPattern, `guard pattern must catch: ${evasion}`);
+  }
+});
+
+test('technology-relevance control filters by evidence and never claims bidding eligibility', () => {
+  assert.match(panel, /data-procurement-tech-relevant/);
+  assert.match(panel, /Technology relevant only/);
+  assert.match(panel, /TECH_RELEVANCE_MIN_SCORE = 30/);
+  assert.match(panel, /minAutomationScore: formData\.get\('techRelevant'\) \? TECH_RELEVANCE_MIN_SCORE : 0/);
+  assert.match(panel, /Keyword relevance evidence only — not an indication of bidding eligibility/);
+  assert.doesNotMatch(panel, /eligible to bid|bidding eligibility confirmed|qualified to bid/i);
+  assert.match(service, /minAutomationScore: 0/);
+  assert.match(docs, /min_automation_score/);
+  assert.match(docs, /Technology relevant only/);
+  assert.match(docs, /never assert that an AI system, agent, or vendor is eligible to bid/);
 });
